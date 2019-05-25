@@ -56,19 +56,14 @@ const int offset = 3;   // Moscow Time
 
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
+// default colors:
+const int default_red   =   0;
+const int default_green = 240;
+const int default_blue  = 255;
+
 /* =============================================================== */
 
-void setup() {
-  Serial.begin(115200);
-  // while (!Serial) ; // Needed for Leonardo only
-  SerialGPS.begin(4800); // "BR-355" GPS module uses 4800 baud speed. Cheaper "Neo6Mv2" uses 9600 baud. Check the datasheet for your model.
-  Serial.println("Initializing LED strip ... ");
-  pixels.begin(); // Initializes NeoPixel strip object
-  pixels.clear(); // Resets LED strip (turns all LEDs off)
-  draw_GPS();
-}
-
-void draw_GPS() {
+static void draw_GPS(int red, int green, int blue) {
   // Draws "GPS..." on the LED strip while we get correct time from satellites
   /*
     G: 228-237, 238-247, 278-287, 268-277, 258-267
@@ -76,59 +71,72 @@ void draw_GPS() {
     S: 80-89, 90-99, 100-109, 110-119, 120-129
     hellip: 50-51, 54-55, 58-59
   */
-
-  strip(228, 237, 0, 0,  90,  90 );
-  strip(238, 247, 0, 0,  90,  90 );
-  strip(278, 287, 0, 0,  90,  90 );
-  strip(267, 277, 0, 0,  90,  90 );
-  strip(258, 267, 0, 0,  90,  90 );
-  strip(148, 157, 0, 0,  90,  90 );
-  strip(158, 167, 0, 0,  90,  90 );
-  strip(168, 177, 0, 0,  90,  90 );
-  strip(178, 187, 0, 0,  90,  90 );
-  strip(208, 217, 0, 0,  90,  90 );
-  strip( 80,  89, 0, 0,  90,  90 );
-  strip( 90,  99, 0, 0,  90,  90 );
-  strip(100, 109, 0, 0,  90,  90 );
-  strip(110, 119, 0, 0,  90,  90 );
-  strip(120, 129, 0, 0,  90,  90 );
-  strip( 50,  50, 0, 0,  90,  90 );
-  strip( 54,  54, 0, 0,  90,  90 );
-  strip( 58,  58, 0, 0,  90,  90 );
-  pixels.show();   // Sends the updated pixel colors to the hardware.
+  strip(228, 237, 0, red, green, blue); 
+  strip(238, 247, 0, red, green, blue); 
+  strip(278, 287, 0, red, green, blue); 
+  strip(267, 277, 0, red, green, blue); 
+  strip(258, 267, 0, red, green, blue); 
+  strip(148, 157, 0, red, green, blue); 
+  strip(158, 167, 0, red, green, blue); 
+  strip(168, 177, 0, red, green, blue); 
+  strip(178, 187, 0, red, green, blue); 
+  strip(208, 217, 0, red, green, blue); 
+  strip( 80,  89, 0, red, green, blue); 
+  strip( 90,  99, 0, red, green, blue); 
+  strip(100, 109, 0, red, green, blue); 
+  strip(110, 119, 0, red, green, blue); 
+  strip(120, 129, 0, red, green, blue); 
+  strip( 50,  50, 0, red, green, blue); 
+  strip( 54,  54, 0, red, green, blue); 
+  strip( 58,  58, 0, red, green, blue); 
 }
 
-void loop() {
-  if (timeStatus() == timeNotSet) {
-    Serial.println("Waiting for GPS time ... ");
-    setGPS();
-  } else { 
-    digitalClockDisplay();
-    // showpixels(); // debug
-    pixels.clear(); // Set all pixel colors to 'off'
-    drawdigit(1, 4, 0, 240, 255);  // debug
-    drawdigit(2, 3, 0, 240, 255);  // debug 
-    drawdigit(3, 2, 0, 240, 255);  // debug
-    drawdigit(4, 1, 0, 240, 255);  // debug
-    pixels.show();   // Sends the updated pixel colors to the hardware.
-  } 
+static void drawtime(int red, int green, int blue) {
+  int h =   hour();
+  int m = minute();
+  int s = second();
+
+  // placeholders for upper and lower digits of time - i.e. "11:23" - "3" is lower minute digit, "2" is upper
+  int h_lo_digit = h % 10;
+  int h_hi_digit = (h - h_lo_digit) / 10;
+  int m_lo_digit = m % 10;
+  int m_hi_digit = (m - m_lo_digit) / 10;
+  
+  drawdigit(h_hi_digit, 4, red, green, blue);  // leftmost position (4th from right)
+  drawdigit(h_lo_digit, 3, red, green, blue);  
+  drawdigit(m_hi_digit, 2, red, green, blue);  
+  drawdigit(m_lo_digit, 1, red, green, blue);  // rightmost position
+
+  if ((s & 0x01) == 0) {
+    // blinks with colon every even second
+    draw_upper_dot(red, green, blue); 
+  } else {
+    draw_lower_dot(red, green, blue); 
+  }
 }
 
-void strip(int start, int end, int offset, int red, int green, int blue) {
+static void strip(int start, int end, int offset, int red, int green, int blue) {
   // Sub-routine to draw a given sequence of LEDs in a given RGB color
   for (int i = (start + offset); i <= (end + offset); i = i + 1) { 
     pixels.setPixelColor(i, pixels.Color(red, green, blue)); 
   }
 }
 
-void drawcolon(int red, int green, int blue) {
-  // Sub-routine to draw a colon in the center of the clock (eight LEDs) in a given RGB color
-  for (int i = 140; i <= 147; i = i + 1) { 
+// Sub-routines to draw a colon in the center of the clock (eight LEDs) in a given RGB color
+static void draw_upper_dot(int red, int green, int blue) {
+  for (int i = 140; i <= 143; i = i + 1) { 
     pixels.setPixelColor(i, pixels.Color(red, green, blue)); 
   }
 }
 
-void drawdigit(int digit, int location, int red, int green, int blue) {
+static void draw_lower_dot(int red, int green, int blue) {
+  for (int i = 144; i <= 147; i = i + 1) { 
+    pixels.setPixelColor(i, pixels.Color(red, green, blue)); 
+  }
+}
+
+
+static void drawdigit(int digit, int location, int red, int green, int blue) {
   // Sub-routine to draw a number (0 to 9) in any of 4 available locations in a given RGB color
   int offset = 0;
   switch (location) {
@@ -220,13 +228,28 @@ void drawdigit(int digit, int location, int red, int green, int blue) {
   }
 }
 
-void setGPS() {
+static void setGPS() {
   // Reads input from GPS and waits until there is enough data from satellites to set the clock correctly.
   // Unless correct time is obtained, "timeStatus()" is set to "timeNotSet".
   // Getting correct data from GPS might take up to 60-90 seconds ("cold start"), so this needs to be invoked in a main loop.
   while (SerialGPS.available()) {
-    if (gps.encode(SerialGPS.read())) { // process gps messages
-      unsigned long age;
+    if (
+      gps.encode(SerialGPS.read())
+    ) { 
+      // process gps messages
+      unsigned long age, date, time, chars = 0;
+      Serial.print("Satellites: ");
+      print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
+      unsigned short sentences = 0, failed = 0;
+      gps.stats(&chars, &sentences, &failed);
+      Serial.print("; Chars processed: ");
+      print_int(chars, 0xFFFFFFFF, 6);
+      Serial.print("; Sentences processed: ");
+      print_int(sentences, 0xFFFFFFFF, 10);
+      Serial.print("; Fails: ");
+      print_int(failed, 0xFFFFFFFF, 9);
+      Serial.println();
+
       int Year;
       byte Month, Day, Hour, Minute, Second;
       gps.crack_datetime(&Year, &Month, &Day, &Hour, &Minute, &Second, NULL, &age);
@@ -239,38 +262,8 @@ void setGPS() {
   }
 }
 
-void showpixels() {
-  // Simple test - sequentailly lights up all LEDs
-  pixels.clear(); // Set all pixel colors to 'off'
-  // The first NeoPixel in a strand is #0, second is 1, all the way up
-  // to the count of pixels minus one.
-  for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
-    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
-    // Here we're using a moderately bright green color:
-    pixels.setPixelColor(i, pixels.Color(255, 255, 255) );
-    pixels.show();   // Send the updated pixel colors to the hardware.
-  }
-  for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
-    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
-    // Here we're using a moderately bright green color:
-    pixels.setPixelColor(i, pixels.Color(255, 0, 0) );
-    pixels.show();   // Send the updated pixel colors to the hardware.
-  }
-  for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
-    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
-    // Here we're using a moderately bright green color:
-    pixels.setPixelColor(i, pixels.Color(0, 255, 0) );
-    pixels.show();   // Send the updated pixel colors to the hardware.
-  }
-  for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
-    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
-    // Here we're using a moderately bright green color:
-    pixels.setPixelColor(i, pixels.Color(0, 0, 255) );
-    pixels.show();   // Send the updated pixel colors to the hardware.
-  }
-}
 
-void digitalClockDisplay(){
+static void debug_time_toserial(){
   // Debug routine to display GPS time in the serial port output
   Serial.print(hour());
   printDigits(minute());
@@ -284,7 +277,7 @@ void digitalClockDisplay(){
   Serial.println(); 
 }
 
-void printDigits(int digits) {
+static void printDigits(int digits) {
   // utility sub-routine for digital clock display: prints preceding colon and pads with zeroes if necessary
   Serial.print(":");
   if (digits < 10) {
@@ -293,3 +286,106 @@ void printDigits(int digits) {
   Serial.print(digits);
 }
 
+
+void setup() {
+  Serial.begin(115200);
+  // while (!Serial) ; // Needed for Leonardo only
+  SerialGPS.begin(4800); // "BR-355" GPS module uses 4800 baud speed. Cheaper "Neo6Mv2" uses 9600 baud. Check the datasheet for your model.
+  Serial.println("Initializing LED strip ... ");
+  pixels.begin(); // Initializes NeoPixel strip object
+  pixels.clear(); // Resets LED strip (turns all LEDs off)
+  draw_GPS(default_red, default_green, default_blue);
+  pixels.show(); // Sends the updated pixel colors to the hardware.
+  Serial.println("Waiting for GPS time ... ");
+}
+
+
+void loop() {
+  if (timeStatus() == timeNotSet) {
+    setGPS();
+  } else {
+    if (timeStatus() == timeNeedsSync) {
+      Serial.println("Re-syncing clock with GPS time ... ");
+      // draw_GPS(default_red, default_green, default_blue);
+      setGPS();
+    } else {
+      // debug_time_toserial();
+      pixels.clear(); // Set all pixel colors to 'off'
+      drawtime(default_red, default_green, default_blue); // Displays current time
+      pixels.show();   // Sends the updated pixel colors to the hardware.
+    }
+  } 
+}
+
+static void smartdelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do 
+  {
+    while (SerialGPS.available())
+      gps.encode(SerialGPS.read());
+  } while (millis() - start < ms);
+}
+
+static void print_float(float val, float invalid, int len, int prec)
+{
+  if (val == invalid)
+  {
+    while (len-- > 1)
+      Serial.print('*');
+    Serial.print(' ');
+  }
+  else
+  {
+    Serial.print(val, prec);
+    int vi = abs((int)val);
+    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
+    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
+    for (int i=flen; i<len; ++i)
+      Serial.print(' ');
+  }
+  smartdelay(0);
+}
+
+static void print_int(unsigned long val, unsigned long invalid, int len)
+{
+  char sz[32];
+  if (val == invalid)
+    strcpy(sz, "*******");
+  else
+    sprintf(sz, "%ld", val);
+  sz[len] = 0;
+  for (int i=strlen(sz); i<len; ++i)
+    sz[i] = ' ';
+  if (len > 0) 
+    sz[len-1] = ' ';
+  Serial.print(sz);
+  smartdelay(0);
+}
+
+static void print_date(TinyGPS &gps)
+{
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  unsigned long age;
+  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
+  if (age == TinyGPS::GPS_INVALID_AGE)
+    Serial.print("********** ******** ");
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d/%02d/%02d %02d:%02d:%02d ",
+        month, day, year, hour, minute, second);
+    Serial.print(sz);
+  }
+  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
+  smartdelay(0);
+}
+
+static void print_str(const char *str, int len)
+{
+  int slen = strlen(str);
+  for (int i=0; i<len; ++i)
+    Serial.print(i<slen ? str[i] : ' ');
+  smartdelay(0);
+}
