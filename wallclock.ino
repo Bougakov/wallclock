@@ -1,3 +1,5 @@
+// #define DEBUG 1
+
 /* =============================================================== */
 
 #include <TimeLib.h> // https://github.com/PaulStoffregen/Time
@@ -57,9 +59,12 @@ const int offset = 3;   // Moscow Time
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
 // default colors:
-const int default_red   =   0;
-const int default_green = 240;
-const int default_blue  = 255;
+byte default_red   =   0;
+byte default_green = 90;
+byte default_blue  = 255;
+// HUE variation range (in HSV model, as in https://www.ginifab.com/feeds/pms/rgb_to_hsv_hsl.html x)
+byte hue_from = 209;
+byte hue_to = 229;
 
 /* =============================================================== */
 
@@ -107,10 +112,9 @@ static void drawtime(int red, int green, int blue) {
   drawdigit(m_hi_digit, 2, red, green, blue);  
   drawdigit(m_lo_digit, 1, red, green, blue);  // rightmost position
 
-  if ((s & 0x01) == 0) {
+  if ((millis() % 600) >= 300) {
     // blinks with colon every even second
     draw_upper_dot(red, green, blue); 
-  } else {
     draw_lower_dot(red, green, blue); 
   }
 }
@@ -238,18 +242,19 @@ static void setGPS() {
     ) { 
       // process gps messages
       unsigned long age, date, time, chars = 0;
-      Serial.print("Satellites: ");
-      print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
-      unsigned short sentences = 0, failed = 0;
-      gps.stats(&chars, &sentences, &failed);
-      Serial.print("; Chars processed: ");
-      print_int(chars, 0xFFFFFFFF, 6);
-      Serial.print("; Sentences processed: ");
-      print_int(sentences, 0xFFFFFFFF, 10);
-      Serial.print("; Fails: ");
-      print_int(failed, 0xFFFFFFFF, 9);
-      Serial.println();
-
+      #ifdef DEBUG
+        Serial.print("Satellites: ");
+        print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
+        unsigned short sentences = 0, failed = 0;
+        gps.stats(&chars, &sentences, &failed);
+        Serial.print("; Chars processed: ");
+        print_int(chars, 0xFFFFFFFF, 6);
+        Serial.print("; Sentences processed: ");
+        print_int(sentences, 0xFFFFFFFF, 10);
+        Serial.print("; Fails: ");
+        print_int(failed, 0xFFFFFFFF, 9);
+        Serial.println();
+      #endif
       int Year;
       byte Month, Day, Hour, Minute, Second;
       gps.crack_datetime(&Year, &Month, &Day, &Hour, &Minute, &Second, NULL, &age);
@@ -257,6 +262,7 @@ static void setGPS() {
         // set the Time to the latest GPS reading
         setTime(Hour, Minute, Second, Day, Month, Year);
         adjustTime(offset * SECS_PER_HOUR);
+        setSyncInterval(15); // corrects internal clock every 15 seconds 
       }
     }
   }
@@ -265,56 +271,126 @@ static void setGPS() {
 
 static void debug_time_toserial(){
   // Debug routine to display GPS time in the serial port output
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
-  Serial.print(" ");
-  Serial.print(day());
-  Serial.print("/");
-  Serial.print(month());
-  Serial.print("/");
-  Serial.print(year()); 
-  Serial.println(); 
+  #ifdef DEBUG 
+    Serial.print(hour());
+    printDigits(minute());
+    printDigits(second());
+    Serial.print(" ");
+    Serial.print(day());
+    Serial.print("/");
+    Serial.print(month());
+    Serial.print("/");
+    Serial.print(year()); 
+    Serial.println(); 
+  #endif
 }
 
 static void printDigits(int digits) {
   // utility sub-routine for digital clock display: prints preceding colon and pads with zeroes if necessary
-  Serial.print(":");
-  if (digits < 10) {
-    Serial.print('0');
-  }
-  Serial.print(digits);
+  #ifdef DEBUG
+    Serial.print(":");
+    if (digits < 10) {
+      Serial.print('0');
+    }
+    Serial.print(digits);
+  #endif
 }
 
-
 void setup() {
-  Serial.begin(115200);
-  // while (!Serial) ; // Needed for Leonardo only
+  #ifdef DEBUG
+    Serial.begin(115200);
+    while (!Serial) ; // Needed for Leonardo only
+  #endif
   SerialGPS.begin(4800); // "BR-355" GPS module uses 4800 baud speed. Cheaper "Neo6Mv2" uses 9600 baud. Check the datasheet for your model.
-  Serial.println("Initializing LED strip ... ");
   pixels.begin(); // Initializes NeoPixel strip object
   pixels.clear(); // Resets LED strip (turns all LEDs off)
   draw_GPS(default_red, default_green, default_blue);
   pixels.show(); // Sends the updated pixel colors to the hardware.
-  Serial.println("Waiting for GPS time ... ");
+  #ifdef DEBUG
+    Serial.println("Waiting for GPS time ... ");
+  #endif
 }
-
 
 void loop() {
   if (timeStatus() == timeNotSet) {
     setGPS();
   } else {
-    if (timeStatus() == timeNeedsSync) {
-      Serial.println("Re-syncing clock with GPS time ... ");
-      // draw_GPS(default_red, default_green, default_blue);
       setGPS();
-    } else {
-      // debug_time_toserial();
-      pixels.clear(); // Set all pixel colors to 'off'
-      drawtime(default_red, default_green, default_blue); // Displays current time
-      pixels.show();   // Sends the updated pixel colors to the hardware.
-    }
+      if (timeStatus() == timeNeedsSync) {
+        #ifdef DEBUG
+          Serial.println("Re-syncing clock with GPS time ... ");
+        #endif
+        draw_GPS(default_red, default_green, default_blue);
+        setGPS();
+      } else {
+        #ifdef DEBUG
+          debug_time_toserial();
+        #endif
+        pixels.clear(); // Set all pixel colors to 'off'
+        if ( second() < 30) {
+          // first half of minute we iterate hue forward,
+          setColorHSV(map(second(),   0, 29, hue_from, hue_to), 255, 255);
+          //default_green = map(second(),  0, 29, 0, 255);
+        } else {
+          // second half of minute we iterate backwards
+          setColorHSV(map(second(),  30, 59, hue_to, hue_from), 255, 255);
+          //default_green = map(second(), 30, 59, 255, 0); 
+        }      
+        drawtime(default_red, default_green, default_blue); // Displays current time
+        pixels.show();   // Sends the updated pixel colors to the hardware.
+      }
   } 
+}
+
+void setColorHSV(byte h, byte s, byte v) {
+  // An HSV to RGB converter using byte and integer arithmetic. 
+  // Called with HSV arguments of from 0 to 255. 
+  // To cycle through a color palette, call it with hues from 0 through 255 and saturation and value of 255.
+  // Source: https://github.com/judge2005/arduinoHSV
+
+  // this is the algorithm to convert from RGB to HSV
+  h = (h * 192) / 256;  // 0..191
+  unsigned int i = h / 32;   // We want a value of 0 thru 5
+  unsigned int f = (h % 32) * 8;   // 'fractional' part of 'i' 0..248 in jumps
+
+  unsigned int sInv = 255 - s;  // 0 -> 0xff, 0xff -> 0
+  unsigned int fInv = 255 - f;  // 0 -> 0xff, 0xff -> 0
+  byte pv = v * sInv / 256;  // pv will be in range 0 - 255
+  byte qv = v * (256 - s * f / 256) / 256;
+  byte tv = v * (256 - s * fInv / 256) / 256;
+
+  switch (i) {
+  case 0:
+    default_red = v;
+    default_green = tv;
+    default_blue = pv;
+    break;
+  case 1:
+    default_red = qv;
+    default_green = v;
+    default_blue = pv;
+    break;
+  case 2:
+    default_red = pv;
+    default_green = v;
+    default_blue = tv;
+    break;
+  case 3:
+    default_red = pv;
+    default_green = qv;
+    default_blue = v;
+    break;
+  case 4:
+    default_red = tv;
+    default_green = pv;
+    default_blue = v;
+    break;
+  case 5:
+    default_red = v;
+    default_green = pv;
+    default_blue = qv;
+    break;
+  }
 }
 
 static void smartdelay(unsigned long ms)
@@ -327,12 +403,12 @@ static void smartdelay(unsigned long ms)
   } while (millis() - start < ms);
 }
 
-static void print_float(float val, float invalid, int len, int prec)
-{
+static void print_float(float val, float invalid, int len, int prec) {
+  #ifdef DEBUG
   if (val == invalid)
   {
     while (len-- > 1)
-      Serial.print('*');
+    Serial.print('*');
     Serial.print(' ');
   }
   else
@@ -344,11 +420,12 @@ static void print_float(float val, float invalid, int len, int prec)
     for (int i=flen; i<len; ++i)
       Serial.print(' ');
   }
+  #endif
   smartdelay(0);
 }
 
-static void print_int(unsigned long val, unsigned long invalid, int len)
-{
+static void print_int(unsigned long val, unsigned long invalid, int len) {
+  #ifdef DEBUG
   char sz[32];
   if (val == invalid)
     strcpy(sz, "*******");
@@ -360,11 +437,12 @@ static void print_int(unsigned long val, unsigned long invalid, int len)
   if (len > 0) 
     sz[len-1] = ' ';
   Serial.print(sz);
+  #endif
   smartdelay(0);
 }
 
-static void print_date(TinyGPS &gps)
-{
+static void print_date(TinyGPS &gps) {
+  #ifdef DEBUG
   int year;
   byte month, day, hour, minute, second, hundredths;
   unsigned long age;
@@ -379,13 +457,15 @@ static void print_date(TinyGPS &gps)
     Serial.print(sz);
   }
   print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
+  #endif
   smartdelay(0);
 }
 
-static void print_str(const char *str, int len)
-{
+static void print_str(const char *str, int len) {
+  #ifdef DEBUG
   int slen = strlen(str);
   for (int i=0; i<len; ++i)
-    Serial.print(i<slen ? str[i] : ' ');
+  Serial.print(i<slen ? str[i] : ' ');
+  #endif
   smartdelay(0);
 }
