@@ -8,4 +8,4 @@ LED-часы с установкой точного времени по GPS из
  * «Точки» посередине – два сегмента по 4 LED.
 * Контроллер – Arduino Nano (Atmega 328P, "old bootloader")
 
-![Wiring](https://raw.githubusercontent.com/Bougakov/wallclock/master/Wall%20clock%20schematics.png)
+![Wiring](https://github.com/Bougakov/wallclock/blob/master/Wall%20clock%20schematics.png)
