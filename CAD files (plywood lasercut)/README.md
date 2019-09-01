@@ -7,4 +7,4 @@ The thickness of plywood can be 4 or 5mm - it doesn't matter.
 The diffusors are best cut from matte acrylic.
 
 
-![Wiring](https://github.com/Bougakov/wallclock/blob/master/CAD files (plywood lasercut)/image.png)
+![Overall look](https://github.com/Bougakov/wallclock/blob/master/CAD%20files%20(plywood%20lasercut)/image.png)
