@@ -42,14 +42,14 @@ int prevSecond = 0; // for debugging
 void setup() {
   Serial.begin(115200);
   GPS_Serial.begin(GPSBaud);
-  checkRTCset();
-  Serial.println();
-  Serial.println("---RTC TIME---");
+
+  setSyncProvider(RTC.get);   // the function to get the time from the RTC
   time_t utc = now();
   if(timeStatus()!= timeSet) {
-    Serial.println(F("Unable to sync with the RTC"));
+    Serial.println(F("Unable to sync with the RTC, check wiring"));
+    while(true); // halt
   } else {
-    Serial.println(F("RTC has set the system time"));
+    Serial.println(F("Initialized the RTC"));
   }
 }
 
@@ -61,68 +61,57 @@ void loop() {
   currentMillis = millis();
   if(!rtcSet){
     Serial.println(F("RTC not set"));
-    setRTCfromGPS();
-    checkRTCset();
+    syncOnBoot();
+  } else {
+    utc = now(); // Grab the current time
+    //printTime(utc, "UTC");
+    local = tzMSK.toLocal(utc, &tcr);
+    //printTime(local, tcr -> abbrev);
+    // Show clock
+    DisplayTime();
   }
-  // Read GPS data from serial connection until no more data is available
-  while (GPS_Serial.available() > 0) {
-    gps.encode(GPS_Serial.read());
-  }
-
-  if (currentMillis > 5000 && gps.charsProcessed() < 10) {
-    Serial.println(F("No GPS detected: check wiring."));
-    while(true);
-  }
-  utc = now(); // Grab the current time
-  //printTime(utc, "UTC");
-  local = tzMSK.toLocal(utc, &tcr);
-  //printTime(local, tcr -> abbrev);
-  
-  syncOnBoot();
-
-  // Show clock
-  DisplayTime();
-  
-  //Syncs GPS time to the RTC regularly.
-  scheduledSync();
-
 }
 
 ////////////////////////////////////
 // FUNCTIONS
 ////////////////////////////////////
 
-void DisplayTime() {
-  if(!rtcSet)  {
-    Serial.println(F("Waiting for GPS Fix"));
-  }else{
-    if (second(local) != prevSecond){
-      Serial.print(hour(local));
-      padZero(minute(local)); 
-      padZero(second(local)); 
-      Serial.println();
-    }
-    prevSecond = second(local);
-  }
-}
-
-void checkRTCset() {
-    setSyncProvider(RTC.get);   // the function to get the time from the RTC
-    if(timeStatus()!= timeSet)
-        Serial.println("Unable to sync with the RTC");
-    else
-        Serial.println("RTC has set the system time");
-}
-
 void syncOnBoot() {
   if(newboot) {
+
+    // Read GPS data from serial connection until no more data is available
+    while (GPS_Serial.available() > 0) {
+      gps.encode(GPS_Serial.read());
+    }
+
+    if (currentMillis > 5000 && gps.charsProcessed() < 10) {
+      Serial.println(F("No GPS detected: check wiring."));
+      while(true); // halt
+    }
+ 
     int satcount = gps.satellites.value();
     if (gps.date.isValid() && gps.time.isValid() && satcount > 4) {
       Serial.print(F("New boot. Need to update RTC with GPS time. Sat count: "));
       Serial.println(satcount);
-      setRTCfromGPS();
-      newboot = false;
-      syncTimer = 0;
+
+      Serial.println("Setting RTC from GPS");
+      Serial.println();
+      if (gps.date.isValid() && gps.time.isValid()) {
+        tm.Year   = gps.date.year();
+        tm.Month  = gps.date.month();
+        tm.Day    = gps.date.day();
+        tm.Hour   = gps.time.hour();
+        tm.Minute = gps.time.minute();
+        tm.Second = gps.time.second();
+        Serial.println(F("RTC set from GPS"));
+        rtcSet = true;
+        newboot = false;
+        syncTimer = 0;
+        GPS_Serial.end(); // stops processing GPS data until clock is rebooted
+      } else {
+        Serial.println(F("No GPS fix yet. Can't set RTC yet."));
+      }
+
     } else {
       if(currentMillis > (syncTimer + 250)) {
         Serial.print(F("GPS not ready yet. Waiting for fix. Sat count: "));
@@ -133,42 +122,24 @@ void syncOnBoot() {
   }
 }
 
-void setRTCfromGPS() {
-  /* This line sets the RTC with an explicit date & time:
-     rtc.adjust(DateTime(2000, 12, 31, 12, 59, 59));
-   */
-  Serial.println("Setting RTC from GPS");
-  Serial.println();
-  if (gps.date.isValid() && gps.time.isValid()) {
-    tm.Year   = gps.date.year();
-    tm.Month  = gps.date.month();
-    tm.Day    = gps.date.day();
-    tm.Hour   = gps.time.hour();
-    tm.Minute = gps.time.minute();
-    tm.Second = gps.time.second();
-    Serial.println(F("RTC set from GPS"));
-    rtcSet = true;
-  } else {
-    Serial.println(F("No GPS fix yet. Can't set RTC yet."));
-  }
-}
-
-void scheduledSync() {
-  /*
-   * Re-syncs the RTC with the time stamp from the GPS data regularly.
-   */
-  if(
-    (currentMillis > (scheduledTimer + 120 * 1000)) && newboot == false
-  ){  // Only allow RTC sync to happen once every 120 sec
-    Serial.println(F("Regular scheduled sync about to proceed..."));
-    setRTCfromGPS();
-    scheduledTimer = currentMillis;
+void DisplayTime() {
+  if(!rtcSet)  {
+    Serial.println(F("Waiting for GPS Fix"));
+  }else{
+    if (second(local) != prevSecond){
+      padZero(  hour(local));
+      Serial.print(":");
+      padZero(minute(local)); 
+      Serial.print(":");
+      padZero(second(local)); 
+      Serial.println();
+    }
+    prevSecond = second(local);
   }
 }
 
 void padZero(int digits){
   // utility function for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
   if(digits < 10) {
     Serial.print('0');
   }
