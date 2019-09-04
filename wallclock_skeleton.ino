@@ -54,11 +54,8 @@ void loop() {
     syncOnBoot();
   } else {
     utc = now(); // Grab the current time
-    //printTime(utc, "UTC");
     local = tzMSK.toLocal(utc, &tcr);
-    //printTime(local, tcr -> abbrev);
-    // Show clock
-    DisplayTime();
+    DisplayTime(); // Shows clock
   }
 }
 
