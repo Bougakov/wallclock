@@ -42,15 +42,6 @@ int prevSecond = 0; // for debugging
 void setup() {
   Serial.begin(115200);
   GPS_Serial.begin(GPSBaud);
-
-  setSyncProvider(RTC.get);   // the function to get the time from the RTC
-  time_t utc = now();
-  if(timeStatus()!= timeSet) {
-    Serial.println(F("Unable to sync with the RTC, check wiring"));
-    while(true); // halt
-  } else {
-    Serial.println(F("Initialized the RTC"));
-  }
 }
 
 ////////////////////////////////////
@@ -60,7 +51,6 @@ void setup() {
 void loop() { 
   currentMillis = millis();
   if(!rtcSet){
-    Serial.println(F("RTC not set"));
     syncOnBoot();
   } else {
     utc = now(); // Grab the current time
@@ -90,12 +80,11 @@ void syncOnBoot() {
     }
  
     int satcount = gps.satellites.value();
-    if (gps.date.isValid() && gps.time.isValid() && satcount > 4) {
+    if (gps.date.isValid() && gps.time.isValid() && satcount >= 4) {
       Serial.print(F("New boot. Need to update RTC with GPS time. Sat count: "));
       Serial.println(satcount);
 
-      Serial.println("Setting RTC from GPS");
-      Serial.println();
+      Serial.println(F("Setting RTC from GPS"));
       if (gps.date.isValid() && gps.time.isValid()) {
         tm.Year   = gps.date.year();
         tm.Month  = gps.date.month();
@@ -103,11 +92,34 @@ void syncOnBoot() {
         tm.Hour   = gps.time.hour();
         tm.Minute = gps.time.minute();
         tm.Second = gps.time.second();
-        Serial.println(F("RTC set from GPS"));
-        rtcSet = true;
-        newboot = false;
-        syncTimer = 0;
-        GPS_Serial.end(); // stops processing GPS data until clock is rebooted
+
+        Serial.print(F("Time from GPS is: "));
+        padZero(gps.time.hour());
+        Serial.print(":");
+        padZero(gps.time.minute()); 
+        Serial.print(":");
+        padZero(gps.time.second()); 
+        Serial.println();
+        
+        // Saves GPS time to RTC
+        if (RTC.write(tm)) {
+          Serial.println(F("RTC is now set from GPS."));
+          rtcSet = true;
+          newboot = false;
+          syncTimer = 0;
+          GPS_Serial.end(); // stops processing GPS data until clock is rebooted (useful since SoftwareSerial messes with hardware timers and causes clock to drift)
+          setSyncProvider(RTC.get); // tells Arduino to get the time from the RTC
+          time_t utc = now();
+          if(timeStatus()!= timeSet) {
+            Serial.println(F("Unable to sync with the RTC, check wiring! "));
+            while(true); // halt
+          } else {
+            Serial.println(F("Initialized the RTC."));
+          }
+        } else {
+          Serial.println(F("Error setting RTC from GPS values: check wiring."));
+          while(true); // halt
+        }
       } else {
         Serial.println(F("No GPS fix yet. Can't set RTC yet."));
       }
