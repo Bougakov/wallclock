@@ -1,17 +1,43 @@
-// #define DEBUG 1
-
-/* =============================================================== */
-
-#include <TimeLib.h> // https://github.com/PaulStoffregen/Time
-#include <TinyGPS.h> // http://arduiniana.org/libraries/TinyGPS/
+#include <DS1307RTC.h>        //https://github.com/PaulStoffregen/DS1307RTC
+#include <Time.h>             //https://github.com/PaulStoffregen/Time
+#include <Timezone.h>         //https://github.com/JChristensen/Timezone
+#include <TinyGPS++.h>        //https://github.com/mikalhart/TinyGPSPlus
 #include <SoftwareSerial.h>
+#include <Wire.h>
+#include <TimeLib.h>
 
-// GPS module is handled by SoftwareSerial
-SoftwareSerial SerialGPS = SoftwareSerial(3, 13);  // receive on pin 3, second pin is irrelevant
-TinyGPS gps; 
-const int offset = 3;   // Moscow Time
+// Serial config for the GPS module
+static const int RXPin = 3, TXPin = 13; // receive on pin 3, second pin is irrelevant
+static const uint32_t GPSBaud = 4800; // "BR-355" GPS module uses 4800 baud speed. Cheaper "Neo6Mv2" uses 9600 baud. 
 
-/* =============================================================== */
+// The TinyGPS++ object
+TinyGPSPlus gps;
+
+// The serial connection to the GPS device
+SoftwareSerial GPS_Serial(RXPin, TXPin);
+
+tmElements_t tm;
+bool rtcSet = false;
+
+//Timezone stuff
+TimeChangeRule msk = {"MSK", Last, Sun, Mar, 1, 180}; // 3 * 60 = 180 minutes between UTC and Moscow
+Timezone tzMSK(msk);
+
+TimeChangeRule *tcr;        //pointer to the time change rule, use to get TZ abbrev
+time_t utc, local;
+
+//variables for time counting
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
+unsigned long syncTimer = 0;
+unsigned long scheduledTimer = 0;
+
+bool newboot = true;
+int prevSecond = 0; // for debugging
+
+
+
+
 
 #include <Adafruit_NeoPixel.h> // Adafruit NeoPixel library
 #define PIN 2 // LED strip is wired to pin #2
@@ -60,22 +86,150 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
 // default colors:
 byte default_red   =   0;
-byte default_green = 90;
+byte default_green =  90;
 byte default_blue  = 255;
-// HUE variation range (in HSV model, as in https://www.ginifab.com/feeds/pms/rgb_to_hsv_hsl.html x)
-byte hue_from = 209;
-byte hue_to = 229;
 
-/* =============================================================== */
+////////////////////////////////////
+// SETUP
+////////////////////////////////////
+
+void setup() {
+  Serial.begin(115200);
+  GPS_Serial.begin(GPSBaud);
+
+  pixels.begin(); // Initializes NeoPixel strip object
+  pixels.clear(); // Resets LED strip (turns all LEDs off)
+  draw_GPS(default_red, default_green, default_blue);
+  pixels.show(); // Sends the updated pixel colors to the hardware.
+}
+
+////////////////////////////////////
+// MAIN LOOP
+////////////////////////////////////
+
+void loop() { 
+  currentMillis = millis();
+  if(!rtcSet){
+    syncOnBoot();
+  } else {
+    setSyncProvider(RTC.get); // tells Arduino to get the time from the RTC
+    time_t utc = now();
+    local = tzMSK.toLocal(utc, &tcr);
+    debugTime(); // prints time to serial monitor
+    handleLED(); // subroutine with all stuff that handles LED display
+  }
+}
+
+////////////////////////////////////
+// FUNCTIONS - CLOCK
+////////////////////////////////////
+
+void syncOnBoot() {
+  if(newboot) {
+
+    // Read GPS data from serial connection until no more data is available
+    while (GPS_Serial.available() > 0) {
+      gps.encode(GPS_Serial.read());
+    }
+
+    if (currentMillis > 5000 && gps.charsProcessed() < 10) {
+      Serial.println(F("No GPS detected: check wiring."));
+      while(true); // halt
+    }
+ 
+    int satcount = gps.satellites.value();
+    if (gps.date.isValid() && gps.time.isValid() && satcount >= 4) {
+      Serial.print(F("New boot. Need to update RTC with GPS time. Sat count: "));
+      Serial.println(satcount);
+
+      Serial.println(F("Setting RTC from GPS"));
+      if (gps.date.isValid() && gps.time.isValid()) {
+        tm.Year   = gps.date.year();
+        tm.Month  = gps.date.month();
+        tm.Day    = gps.date.day();
+        tm.Hour   = gps.time.hour();
+        tm.Minute = gps.time.minute();
+        tm.Second = gps.time.second();
+
+        Serial.print(F("UTC time from GPS is: "));
+        padZero(gps.time.hour());
+        Serial.print(":");
+        padZero(gps.time.minute()); 
+        Serial.print(":");
+        padZero(gps.time.second()); 
+        Serial.println();
+        
+        // Saves GPS time to RTC
+        if (RTC.write(tm)) {
+          Serial.println(F("RTC is now set from GPS."));
+          rtcSet = true;
+          newboot = false;
+          syncTimer = 0;
+          GPS_Serial.end(); // stops processing GPS data until clock is rebooted (useful since SoftwareSerial messes with hardware timers and causes clock to drift)
+          setSyncProvider(RTC.get); // tells Arduino to get the time from the RTC
+          time_t utc = now();
+          local = tzMSK.toLocal(utc, &tcr);
+          if(timeStatus()!= timeSet) {
+            Serial.println(F("Unable to sync with the RTC, check wiring! "));
+            while(true); // halt
+          } else {
+            Serial.println(F("Initialized the RTC."));
+          }
+        } else {
+          Serial.println(F("Error setting RTC from GPS values: check wiring."));
+          while(true); // halt
+        }
+      } else {
+        Serial.println(F("No GPS fix yet. Can't set RTC yet."));
+      }
+
+    } else {
+      if(currentMillis > (syncTimer + 250)) {
+        Serial.print(F("GPS not ready yet. Waiting for fix. Sat count: "));
+        Serial.println(satcount);
+        syncTimer = currentMillis;
+      }
+    }
+  }
+}
+
+void debugTime() {
+  if(!rtcSet)  {
+    Serial.println(F("Waiting for GPS Fix"));
+  } else {
+    if (second(local) != prevSecond){
+      padZero(  hour(local));
+      Serial.print(":");
+      padZero(minute(local)); 
+      Serial.print(":");
+      padZero(second(local)); 
+      Serial.println();
+    }
+    prevSecond = second(local);
+  }
+}
+
+void padZero(int digits){
+  // utility function for digital clock display: prints preceding colon and leading 0
+  if(digits < 10) {
+    Serial.print('0');
+  }
+  Serial.print(digits);
+}
+
+////////////////////////////////////
+// FUNCTIONS - LED STRIP
+////////////////////////////////////
 
 static void draw_GPS(int red, int green, int blue) {
-  // Draws "GPS..." on the LED strip while we get correct time from satellites
+  // Draws four characters, "GPS…", on the LED strip while we get correct time from satellites
   /*
     G: 228-237, 238-247, 278-287, 268-277, 258-267
     P: 148-157, 158-167, 168-177, 178-187, 208-217
     S: 80-89, 90-99, 100-109, 110-119, 120-129
     hellip: 50-51, 54-55, 58-59
   */
+  pixels.clear(); // Set all pixel colors to 'off'
   strip(228, 237, 0, red, green, blue); 
   strip(238, 247, 0, red, green, blue); 
   strip(278, 287, 0, red, green, blue); 
@@ -94,12 +248,29 @@ static void draw_GPS(int red, int green, int blue) {
   strip( 50,  50, 0, red, green, blue); 
   strip( 54,  54, 0, red, green, blue); 
   strip( 58,  58, 0, red, green, blue); 
+  pixels.show();
+}
+
+static void handleLED() { // Main routine that handles displaying time on LED strip:
+  pixels.clear(); // Set all pixel colors to 'off'
+  // Below fragment needs to be rewritten to implement better colour transitions - currently it only adjusts green component linearly
+  /*
+  if ( second(local) < 30) {
+    // first half of minute we iterate colors forward,
+    default_green = map(second(local),  0, 29, 0, 255);
+  } else {
+    // second half of minute we iterate them backwards
+    default_green = map(second(local), 30, 59, 255, 0); 
+  } 
+  */     
+  drawtime(default_red, default_green, default_blue); // Displays current time
+  pixels.show();   // Sends the updated pixel colors to the hardware.  
 }
 
 static void drawtime(int red, int green, int blue) {
-  int h =   hour();
-  int m = minute();
-  int s = second();
+  int h =   hour(local);
+  int m = minute(local);
+  int s = second(local);
 
   // placeholders for upper and lower digits of time - i.e. "11:23" - "3" is lower minute digit, "2" is upper
   int h_lo_digit = h % 10;
@@ -113,7 +284,7 @@ static void drawtime(int red, int green, int blue) {
   drawdigit(m_lo_digit, 1, red, green, blue);  // rightmost position
 
   if ((millis() % 600) >= 300) {
-    // blinks with colon every even second
+    // blinks with colon every 300ms
     draw_upper_dot(red, green, blue); 
     draw_lower_dot(red, green, blue); 
   }
@@ -138,7 +309,6 @@ static void draw_lower_dot(int red, int green, int blue) {
     pixels.setPixelColor(i, pixels.Color(red, green, blue)); 
   }
 }
-
 
 static void drawdigit(int digit, int location, int red, int green, int blue) {
   // Sub-routine to draw a number (0 to 9) in any of 4 available locations in a given RGB color
@@ -230,242 +400,4 @@ static void drawdigit(int digit, int location, int red, int green, int blue) {
       strip( 60,  69, offset, red, green, blue);
       break;
   }
-}
-
-static void setGPS() {
-  // Reads input from GPS and waits until there is enough data from satellites to set the clock correctly.
-  // Unless correct time is obtained, "timeStatus()" is set to "timeNotSet".
-  // Getting correct data from GPS might take up to 60-90 seconds ("cold start"), so this needs to be invoked in a main loop.
-  while (SerialGPS.available()) {
-    if (
-      gps.encode(SerialGPS.read())
-    ) { 
-      // process gps messages
-      unsigned long age, date, time, chars = 0;
-      #ifdef DEBUG
-        Serial.print("Satellites: ");
-        print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
-        unsigned short sentences = 0, failed = 0;
-        gps.stats(&chars, &sentences, &failed);
-        Serial.print("; Chars processed: ");
-        print_int(chars, 0xFFFFFFFF, 6);
-        Serial.print("; Sentences processed: ");
-        print_int(sentences, 0xFFFFFFFF, 10);
-        Serial.print("; Fails: ");
-        print_int(failed, 0xFFFFFFFF, 9);
-        Serial.println();
-      #endif
-      int Year;
-      byte Month, Day, Hour, Minute, Second;
-      gps.crack_datetime(&Year, &Month, &Day, &Hour, &Minute, &Second, NULL, &age);
-      if (age < 500) {
-        // set the Time to the latest GPS reading
-        setTime(Hour, Minute, Second, Day, Month, Year);
-        adjustTime(offset * SECS_PER_HOUR);
-        setSyncInterval(15); // corrects internal clock every 15 seconds 
-      }
-    }
-  }
-}
-
-
-static void debug_time_toserial(){
-  // Debug routine to display GPS time in the serial port output
-  #ifdef DEBUG 
-    Serial.print(hour());
-    printDigits(minute());
-    printDigits(second());
-    Serial.print(" ");
-    Serial.print(day());
-    Serial.print("/");
-    Serial.print(month());
-    Serial.print("/");
-    Serial.print(year()); 
-    Serial.println(); 
-  #endif
-}
-
-static void printDigits(int digits) {
-  // utility sub-routine for digital clock display: prints preceding colon and pads with zeroes if necessary
-  #ifdef DEBUG
-    Serial.print(":");
-    if (digits < 10) {
-      Serial.print('0');
-    }
-    Serial.print(digits);
-  #endif
-}
-
-void setup() {
-  #ifdef DEBUG
-    Serial.begin(115200);
-    while (!Serial) ; // Needed for Leonardo only
-  #endif
-  SerialGPS.begin(4800); // "BR-355" GPS module uses 4800 baud speed. Cheaper "Neo6Mv2" uses 9600 baud. Check the datasheet for your model.
-  pixels.begin(); // Initializes NeoPixel strip object
-  pixels.clear(); // Resets LED strip (turns all LEDs off)
-  draw_GPS(default_red, default_green, default_blue);
-  pixels.show(); // Sends the updated pixel colors to the hardware.
-  #ifdef DEBUG
-    Serial.println("Waiting for GPS time ... ");
-  #endif
-}
-
-void loop() {
-  if (timeStatus() == timeNotSet) {
-    setGPS();
-  } else {
-      setGPS();
-      if (timeStatus() == timeNeedsSync) {
-        #ifdef DEBUG
-          Serial.println("Re-syncing clock with GPS time ... ");
-        #endif
-        draw_GPS(default_red, default_green, default_blue);
-        setGPS();
-      } else {
-        #ifdef DEBUG
-          debug_time_toserial();
-        #endif
-        pixels.clear(); // Set all pixel colors to 'off'
-        if ( second() < 30) {
-          // first half of minute we iterate hue forward,
-          setColorHSV(map(second(),   0, 29, hue_from, hue_to), 255, 255);
-          //default_green = map(second(),  0, 29, 0, 255);
-        } else {
-          // second half of minute we iterate backwards
-          setColorHSV(map(second(),  30, 59, hue_to, hue_from), 255, 255);
-          //default_green = map(second(), 30, 59, 255, 0); 
-        }      
-        drawtime(default_red, default_green, default_blue); // Displays current time
-        pixels.show();   // Sends the updated pixel colors to the hardware.
-      }
-  } 
-}
-
-void setColorHSV(byte h, byte s, byte v) {
-  // An HSV to RGB converter using byte and integer arithmetic. 
-  // Called with HSV arguments of from 0 to 255. 
-  // To cycle through a color palette, call it with hues from 0 through 255 and saturation and value of 255.
-  // Source: https://github.com/judge2005/arduinoHSV
-
-  // this is the algorithm to convert from RGB to HSV
-  h = (h * 192) / 256;  // 0..191
-  unsigned int i = h / 32;   // We want a value of 0 thru 5
-  unsigned int f = (h % 32) * 8;   // 'fractional' part of 'i' 0..248 in jumps
-
-  unsigned int sInv = 255 - s;  // 0 -> 0xff, 0xff -> 0
-  unsigned int fInv = 255 - f;  // 0 -> 0xff, 0xff -> 0
-  byte pv = v * sInv / 256;  // pv will be in range 0 - 255
-  byte qv = v * (256 - s * f / 256) / 256;
-  byte tv = v * (256 - s * fInv / 256) / 256;
-
-  switch (i) {
-  case 0:
-    default_red = v;
-    default_green = tv;
-    default_blue = pv;
-    break;
-  case 1:
-    default_red = qv;
-    default_green = v;
-    default_blue = pv;
-    break;
-  case 2:
-    default_red = pv;
-    default_green = v;
-    default_blue = tv;
-    break;
-  case 3:
-    default_red = pv;
-    default_green = qv;
-    default_blue = v;
-    break;
-  case 4:
-    default_red = tv;
-    default_green = pv;
-    default_blue = v;
-    break;
-  case 5:
-    default_red = v;
-    default_green = pv;
-    default_blue = qv;
-    break;
-  }
-}
-
-static void smartdelay(unsigned long ms)
-{
-  unsigned long start = millis();
-  do 
-  {
-    while (SerialGPS.available())
-      gps.encode(SerialGPS.read());
-  } while (millis() - start < ms);
-}
-
-static void print_float(float val, float invalid, int len, int prec) {
-  #ifdef DEBUG
-  if (val == invalid)
-  {
-    while (len-- > 1)
-    Serial.print('*');
-    Serial.print(' ');
-  }
-  else
-  {
-    Serial.print(val, prec);
-    int vi = abs((int)val);
-    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
-    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
-    for (int i=flen; i<len; ++i)
-      Serial.print(' ');
-  }
-  #endif
-  smartdelay(0);
-}
-
-static void print_int(unsigned long val, unsigned long invalid, int len) {
-  #ifdef DEBUG
-  char sz[32];
-  if (val == invalid)
-    strcpy(sz, "*******");
-  else
-    sprintf(sz, "%ld", val);
-  sz[len] = 0;
-  for (int i=strlen(sz); i<len; ++i)
-    sz[i] = ' ';
-  if (len > 0) 
-    sz[len-1] = ' ';
-  Serial.print(sz);
-  #endif
-  smartdelay(0);
-}
-
-static void print_date(TinyGPS &gps) {
-  #ifdef DEBUG
-  int year;
-  byte month, day, hour, minute, second, hundredths;
-  unsigned long age;
-  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
-  if (age == TinyGPS::GPS_INVALID_AGE)
-    Serial.print("********** ******** ");
-  else
-  {
-    char sz[32];
-    sprintf(sz, "%02d/%02d/%02d %02d:%02d:%02d ",
-        month, day, year, hour, minute, second);
-    Serial.print(sz);
-  }
-  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
-  #endif
-  smartdelay(0);
-}
-
-static void print_str(const char *str, int len) {
-  #ifdef DEBUG
-  int slen = strlen(str);
-  for (int i=0; i<len; ++i)
-  Serial.print(i<slen ? str[i] : ' ');
-  #endif
-  smartdelay(0);
 }
