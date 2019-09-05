@@ -53,6 +53,7 @@ void loop() {
   if(!rtcSet){
     syncOnBoot();
   } else {
+    setSyncProvider(RTC.get); // forces Arduino to get the time from the RTC
     utc = now(); // Grab the current time
     local = tzMSK.toLocal(utc, &tcr);
     DisplayTime(); // Shows clock
