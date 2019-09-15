@@ -1,4 +1,4 @@
-#include <Time.h>             //https://github.com/PaulStoffregen/Time with patch from https://github.com/Daemach/Time/
+#include <Time.h>        //https://github.com/PaulStoffregen/Time with patch from https://github.com/Daemach/Time/
 #include <DS1307RTC.h>        //https://github.com/PaulStoffregen/DS1307RTC
 #include <Timezone.h>         //https://github.com/JChristensen/Timezone
 #include <TinyGPS++.h>        //https://github.com/mikalhart/TinyGPSPlus
@@ -299,10 +299,10 @@ void debugTime() {
       padZero(second(local)); 
       Serial.println();
     
-      Serial.print(F("Are we in a break? "));
-      Serial.println(isSchoolbreak);
-      Serial.print(F("Countdown to next lesson: "));
-      Serial.println(countdownToBreak);
+      // Serial.print(F("Are we in a break? "));
+      // Serial.println(isSchoolbreak);
+      // Serial.print(F("Countdown to next lesson: "));
+      // Serial.println(countdownToBreak);
     }
     prevSecond = second(local);
   }
@@ -352,19 +352,8 @@ void draw_GPS(int red, int green, int blue) {
 
 void handleLED() { // Main routine that handles displaying time on LED strip:
   pixels.clear(); // Set all pixel colors to 'off'
-  // Below fragment needs to be rewritten to implement better colour transitions - currently it only adjusts green component linearly
-  /*
-  if ( second(local) < 30) {
-    // first half of minute we iterate colors forward,
-    default_green = map(second(local),  0, 29, 0, 255);
-  } else {
-    // second half of minute we iterate them backwards
-    default_green = map(second(local), 30, 59, 255, 0); 
-  } 
-  */     
-
   if(isSchoolbreak == 0) {
-  drawtime(default_red, default_green, default_blue); // Displays current time
+    drawtime(default_red, default_green, default_blue); // Displays current time
   } else {
     drawcountdown(int(countdownToBreak));
   }
@@ -386,8 +375,8 @@ void drawtime(int red, int green, int blue) {
   drawdigit(m_hi_digit, 2, red, green, blue);  
   drawdigit(m_lo_digit, 1, red, green, blue);  // rightmost position
 
-  if ((millis() % 600) >= 300) {
-    // blinks with colon every 300ms
+  if ((millis() % 800) >= 400) {
+    // blinks with colon every 400ms
     draw_upper_dot(red, green, blue); 
     draw_lower_dot(red, green, blue); 
   }
@@ -395,13 +384,14 @@ void drawtime(int red, int green, int blue) {
 
 void drawcountdown(int cnt) { // displays the countdown - time left till next lesson starts
   // placeholders for upper and lower digits of countdown timer
-  int tenhundr = 0;
-  int hundreds = 0;
-  int tens = 0;
-  int singles = 0;
-  int countdown_red = 255;
-  int countdown_green = 255;
-  int countdown_blue = 255;
+  int thousands = 0;
+  int  hundreds = 0;
+  int      tens = 0;
+  int   singles = 0;
+  
+  int countdown_red   = 220;
+  int countdown_green = 220;
+  int countdown_blue  = 220;
 
   if (cnt < 60) {
     countdown_red = 255;
@@ -412,7 +402,7 @@ void drawcountdown(int cnt) { // displays the countdown - time left till next le
   // here we split the countdown timer in 3 digits to be displayed separately
 
   if (cnt >= 1000) {
-    tenhundr = (cnt / 1000);
+    thousands = (cnt / 1000);
     cnt = cnt % 1000;
   }
 
@@ -428,14 +418,14 @@ void drawcountdown(int cnt) { // displays the countdown - time left till next le
 
   singles = cnt;
 
-  if (tenhundr != 0) { // leftmost position (4th from right)
-    drawdigit(tenhundr, 4, countdown_red, countdown_green, countdown_blue);
+  if (thousands != 0) { // leftmost position (4th from right)
+    drawdigit(thousands, 4, countdown_red, countdown_green, countdown_blue);
   }
   if (hundreds != 0) {
     drawdigit(hundreds, 3, countdown_red, countdown_green, countdown_blue);
   }
   else {
-    if (tenhundr != 0) {
+    if (thousands != 0) {
       drawdigit(hundreds, 3, countdown_red, countdown_green, countdown_blue);
     }
   }
