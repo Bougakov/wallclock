@@ -94,6 +94,8 @@ byte default_green =  90;
 byte default_blue  = 255;
 
 // Variables to hold timetable of lessons:
+time_t  break0start ;
+time_t  break0end   ;
 time_t  break1start ;
 time_t  break1end   ;
 time_t  break2start ;
@@ -163,6 +165,8 @@ void schoolBreak() { // sets times of lessons and breaks on current day (in UTC 
   // 8 15:55 16:40 16:40 
 
   // Times entered here need to be in the local timezone (I don't know why)
+  break0start = makeTime(year(local), month(local), day(local),  8, 58,  0);
+  break0end   = makeTime(year(local), month(local), day(local),  8, 59, 59);
   break1start = makeTime(year(local), month(local), day(local),  9, 45,  0);
   break1end   = makeTime(year(local), month(local), day(local),  9, 54, 59);
   break2start = makeTime(year(local), month(local), day(local), 10, 40,  0);
@@ -178,6 +182,11 @@ void schoolBreak() { // sets times of lessons and breaks on current day (in UTC 
   break7start = makeTime(year(local), month(local), day(local), 15, 40,  0);
   break7end   = makeTime(year(local), month(local), day(local), 15, 54, 59);
 
+  if ((local >= break0start) && (break0end >= local)) {
+    isSchoolbreak = 1;
+    countdownToBreak = long(break0end - local);
+  };
+
   if ((local >= break1start) && (break1end >= local)) {
     isSchoolbreak = 1;
     countdownToBreak = long(break1end - local);
@@ -192,6 +201,7 @@ void schoolBreak() { // sets times of lessons and breaks on current day (in UTC 
     isSchoolbreak = 1;
     countdownToBreak = long(break3end - local);
   };
+  
   if ((local >= break4start) && (break4end >= local)) {
     isSchoolbreak = 1;
     countdownToBreak = long(break4end - local);
