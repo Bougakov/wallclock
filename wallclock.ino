@@ -1,4 +1,4 @@
-#include <Time.h>        //https://github.com/PaulStoffregen/Time with patch from https://github.com/Daemach/Time/
+#include <Time.h>             //https://github.com/PaulStoffregen/Time with patch from https://github.com/PaulStoffregen/Time/pull/131/files
 #include <DS1307RTC.h>        //https://github.com/PaulStoffregen/DS1307RTC
 #include <Timezone.h>         //https://github.com/JChristensen/Timezone
 #include <TinyGPS++.h>        //https://github.com/mikalhart/TinyGPSPlus
@@ -27,7 +27,7 @@ int tzOff = 3; // plus three hours from UTC to Moscow time zone
 TimeChangeRule ruMSK = {"MSK", Last, Sun, Mar, 1, tzOff * 60}; // number of hours * 60 mins in each hour = 180 minutes between UTC and Moscow
 Timezone tzMSK(ruMSK, ruMSK); // For a time zone that does not change to daylight/summer time, we pass a single rule to the constructor
 
-TimeChangeRule *tcr;        //pointer to the time change rule, use to get TZ abbrev
+TimeChangeRule *tcr; //pointer to the time change rule, use to get TZ abbrev
 time_t utc, local;
 
 //variables for time counting
