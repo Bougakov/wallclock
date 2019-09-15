@@ -18,7 +18,7 @@ The clock can be assembled from laser-cut sheets of 4mm plywood. The layouts (in
 
 ## Wiring
 
-* GPS is connected (via "MAX232" RS232 to TTL converter) to `D3` pin of Arduino.
+* GPS is connected (via "MAX232" RS232 to TTL converter) to `D3` pin of Arduino. Don't forget to double-check the baud rate of your GPS.
 * LED strip (288 "WS2812" LEDs) – to pin `D2`.
   * Each "digit" is made of 7 segments, 10 LEDs each. 
   * "Colon" in the middle is made of 2 segments, 4 LEDs each.
@@ -30,3 +30,14 @@ The clock can be assembled from laser-cut sheets of 4mm plywood. The layouts (in
 
 Avoid voltage drop by wiring LED strip to external power source in multiple points.
 For heat dissipation use 5m of 10mm aluminum strip cut to length of LED fragments. There are vent holes on the back that allow aluminum strips to dissipate heat to the wall. Fix the LEDs and strips using zip ties.
+
+## Adjusting time table for your school:
+
+To change the time ranges check out this code fragment:
+
+```
+  break2start = makeTime(year(local), month(local), day(local), 10, 40,  0);
+  break2end   = makeTime(year(local), month(local), day(local), 10, 54, 59);
+```
+
+It tells Arduino that the break after the 2nd lesson is between 10:40am and 10:55. Please note that times entered here need to be in the local timezone, not UTC.
