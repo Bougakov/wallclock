@@ -1,10 +1,14 @@
 #include <DS1307RTC.h>        //https://github.com/PaulStoffregen/DS1307RTC
-#include <Time.h>             //https://github.com/PaulStoffregen/Time
+#include <Time.h>             //https://github.com/PaulStoffregen/Time with patch from https://github.com/Daemach/Time/
 #include <Timezone.h>         //https://github.com/JChristensen/Timezone
 #include <TinyGPS++.h>        //https://github.com/mikalhart/TinyGPSPlus
 #include <SoftwareSerial.h>
 #include <Wire.h>
 #include <TimeLib.h>
+
+////////////////////////////////////
+// INIT - GPS & REAL-TIME CLOCK
+////////////////////////////////////
 
 // Serial config for the GPS module
 static const int RXPin = 3, TXPin = 13; // receive on pin 3, second pin is irrelevant
@@ -20,8 +24,8 @@ tmElements_t tm;
 bool rtcSet = false;
 
 //Timezone stuff
-TimeChangeRule msk = {"MSK", Last, Sun, Mar, 1, 180}; // 3 * 60 = 180 minutes between UTC and Moscow
-Timezone tzMSK(msk);
+TimeChangeRule ruMSK = {"MSK", Last, Sun, Mar, 1, 180}; // 3 hours * 60 mins in each hour = 180 minutes between UTC and Moscow
+Timezone tzMSK(ruMSK, ruMSK); // For a time zone that does not change to daylight/summer time, we pass a single rule to the constructor
 
 TimeChangeRule *tcr;        //pointer to the time change rule, use to get TZ abbrev
 time_t utc, local;
@@ -35,9 +39,9 @@ unsigned long scheduledTimer = 0;
 bool newboot = true;
 int prevSecond = 0; // for debugging
 
-
-
-
+////////////////////////////////////
+// INIT - NEOPIXEL
+////////////////////////////////////
 
 #include <Adafruit_NeoPixel.h> // Adafruit NeoPixel library
 #define PIN 2 // LED strip is wired to pin #2
@@ -89,6 +93,25 @@ byte default_red   =   0;
 byte default_green =  90;
 byte default_blue  = 255;
 
+// Variables to hold timetable of lessons:
+
+time_t  break1start , break1start_local ;
+time_t  break1end , break1end_local ;
+time_t  break2start , break2start_local ;
+time_t  break2end , break2end_local ;
+time_t  break3start , break3start_local ;
+time_t  break3end , break3end_local ;
+time_t  break4start , break4start_local ;
+time_t  break4end , break4end_local ;
+time_t  break5start , break5start_local ;
+time_t  break5end , break5end_local ;
+time_t  break6start , break6start_local ;
+time_t  break6end , break6end_local ;
+time_t  break7start , break7start_local ;
+time_t  break7end , break7end_local ;
+bool isSchoolbreak = false; // Are we in between lessons?
+unsigned long countdown = 0; // Countdown to next lesson' start.
+
 ////////////////////////////////////
 // SETUP
 ////////////////////////////////////
@@ -109,15 +132,105 @@ void setup() {
 
 void loop() { 
   currentMillis = millis();
+  isSchoolbreak = false; // resets flag
+  countdown = 0; // resets countdown to next lesson' start.
+
   if(!rtcSet){
     syncOnBoot();
   } else {
     setSyncProvider(RTC.get); // tells Arduino to get the time from the RTC
     time_t utc = now();
     local = tzMSK.toLocal(utc, &tcr);
+    timetable(); // sets times of lessons and breaks on current day
+    schoolbreak(); // checks whether we are in between lessons
     debugTime(); // prints time to serial monitor
     handleLED(); // subroutine with all stuff that handles LED display
   }
+}
+
+////////////////////////////////////
+// FUNCTIONS - TIMETABLE
+////////////////////////////////////
+
+
+/*
+
+#  Lesson starts Lesson ends Break starts  Break ends
+1 9:00  9:45  9:45  9:55
+2 9:55  10:40 10:40 10:55
+3 10:55 11:40 11:40 11:55
+4 11:55 12:40 12:40 12:55
+5 12:55 13:40 13:40 13:55
+6 13:55 14:40 14:40 14:55
+7 14:55 15:40 15:40 15:55
+8 15:55 16:40 16:40 
+
+*/
+
+void schoolbreak() { // checks whether we are in between lessons
+    // NB: if in reverse order, the value of 4294967295 (32bit integer) would pop up enstead of negative values
+    isSchoolbreak = false;
+    if ((local > break1start_local) && (local < break1end_local)) {
+        isSchoolbreak = true;
+        countdown = break1end_local - local;
+    }
+    if ((local > break2start_local) && (break2end_local > local)) {
+        isSchoolbreak = true;
+        countdown = break2end_local - local;
+    }
+    if ((local > break3start_local) && (break3end_local > local)) {
+        isSchoolbreak = true;
+        countdown = break3end_local - local;
+    }
+    if ((local > break4start_local) && (break4end_local > local)) {
+        isSchoolbreak = true;
+        countdown = break4end_local - local;
+    }
+    if ((local > break5start_local) && (break5end_local > local)) {
+        isSchoolbreak = true;
+        countdown = break5end_local - local;
+    }
+    if ((local > break6start_local) && (break6end_local > local)) {
+        isSchoolbreak = true;
+        countdown = break6end_local - local;
+    }
+    if ((local > break7start_local) && (break7end_local > local)) {
+        isSchoolbreak = true;
+        countdown = break7end_local - local;
+    }
+}
+
+void timetable() { // sets times of lessons and breaks on current day (in UTC time zone)
+  break1start  = makeTime(year(local), month(local), day(local),  9 - 3, 45,  0);
+  break1end    = makeTime(year(local), month(local), day(local),  9 - 3, 54, 59);
+  break2start  = makeTime(year(local), month(local), day(local), 10 - 3, 40,  0);
+  break2end    = makeTime(year(local), month(local), day(local), 10 - 3, 54, 59);
+  break3start  = makeTime(year(local), month(local), day(local), 11 - 3, 40, 0);
+  break3end    = makeTime(year(local), month(local), day(local), 11 - 3, 54, 59);
+  break4start  = makeTime(year(local), month(local), day(local), 12 - 3, 40,  0);
+  break4end    = makeTime(year(local), month(local), day(local), 12 - 3, 54, 59);
+  break5start  = makeTime(year(local), month(local), day(local), 13 - 3, 40,  0);
+  break5end    = makeTime(year(local), month(local), day(local), 13 - 3, 54, 59);
+  break6start  = makeTime(year(local), month(local), day(local), 14 - 3, 40,  0);
+  break6end    = makeTime(year(local), month(local), day(local), 14 - 3, 54, 59);
+  break7start  = makeTime(year(local), month(local), day(local), 15 - 3, 40,  0);
+  break7end    = makeTime(year(local), month(local), day(local), 15 - 3, 54, 59);
+
+  break1start_local = tzMSK.toLocal(break1start, &tcr);
+  break1end_local   = tzMSK.toLocal(break1end, &tcr);
+  break2start_local = tzMSK.toLocal(break2start, &tcr);
+  break2end_local   = tzMSK.toLocal(break2end, &tcr);
+  break3start_local = tzMSK.toLocal(break3start, &tcr);
+  break3end_local   = tzMSK.toLocal(break3end, &tcr);
+  break4start_local = tzMSK.toLocal(break4start, &tcr);
+  break4end_local   = tzMSK.toLocal(break4end, &tcr);
+  break5start_local = tzMSK.toLocal(break5start, &tcr);
+  break5end_local   = tzMSK.toLocal(break5end, &tcr);
+  break6start_local = tzMSK.toLocal(break6start, &tcr);
+  break6end_local   = tzMSK.toLocal(break6end, &tcr);
+  break7start_local = tzMSK.toLocal(break7start, &tcr);
+  break7end_local   = tzMSK.toLocal(break7end, &tcr);
+  
 }
 
 ////////////////////////////////////
@@ -204,8 +317,13 @@ void debugTime() {
       Serial.print(":");
       padZero(second(local)); 
       Serial.println();
+    
+      prevSecond = second(local);
+      Serial.print("Are we in a break? ");
+      Serial.println(isSchoolbreak);
+      Serial.print("Countdown to next lesson: ");
+      Serial.println(countdown);
     }
-    prevSecond = second(local);
   }
 }
 
@@ -263,14 +381,17 @@ static void handleLED() { // Main routine that handles displaying time on LED st
     default_green = map(second(local), 30, 59, 255, 0); 
   } 
   */     
-  drawtime(default_red, default_green, default_blue); // Displays current time
+  if(isSchoolbreak = false) {
+    drawtime(default_red, default_green, default_blue); // Displays current time
+  } else {
+    drawcountdown(countdown);
+  }
   pixels.show();   // Sends the updated pixel colors to the hardware.  
 }
 
 static void drawtime(int red, int green, int blue) {
   int h =   hour(local);
   int m = minute(local);
-  int s = second(local);
 
   // placeholders for upper and lower digits of time - i.e. "11:23" - "3" is lower minute digit, "2" is upper
   int h_lo_digit = h % 10;
@@ -288,6 +409,77 @@ static void drawtime(int red, int green, int blue) {
     draw_upper_dot(red, green, blue); 
     draw_lower_dot(red, green, blue); 
   }
+}
+
+static void drawcountdown(int cnt) { // displays the countdown - time left till next lesson starts
+  // placeholders for upper and lower digits of countdown timer
+  int tenhundr = 0;
+  int hundreds = 0;
+  int tens = 0;
+  int singles = 0;
+  int countdown_red   = 255;
+  int countdown_green = 255;
+  int countdown_blue  = 255;
+
+  // depending on how much time is left we gradually switch from green to red color:
+  if (cnt >= 600) {
+    // greenest  #2dc937  (45,201,55)
+    countdown_red   =  45;
+    countdown_green = 201;
+    countdown_blue  =  55;
+  }
+
+  if (cnt >= 400) {
+    // greenish  #99c140 (153,193,64)
+    countdown_red   = 153;
+    countdown_green = 193;
+    countdown_blue  =  64;
+  }
+
+  if (cnt >= 200) {
+    // yellow #e7b416  (231,180,22)
+    countdown_red   = 231;
+    countdown_green = 180;
+    countdown_blue  =  22;
+  }
+
+  if (cnt >=  60) {
+    // orange  #db7b2b (219,123,43)
+    countdown_red   = 219;
+    countdown_green = 123;
+    countdown_blue  =  43;
+  }
+
+  if (cnt <   60) {
+    // red #cc3232 (204,50,50)
+    countdown_red   = 255;
+    countdown_green =   0;
+    countdown_blue  =   0;
+  }
+
+  // here we split the countdown timer in 3 digits to be displayed separately
+
+  if (cnt >= 1000) {
+     tenhundr = (cnt / 1000);
+     cnt = cnt % 1000;
+  }
+  
+  if (cnt >= 100) {
+     hundreds = (cnt / 100);
+     cnt = cnt % 100;
+  }
+  
+  if (cnt >= 10) {
+     tens = (cnt / 10);
+     cnt = cnt % 10;
+  }
+  
+  singles = cnt;
+    
+  if(tenhundr != 0) { drawdigit(tenhundr, 4, countdown_red, countdown_green, countdown_blue); } // leftmost position (4th from right)
+  if(hundreds != 0) { drawdigit(hundreds, 3, countdown_red, countdown_green, countdown_blue); }  
+  if(    tens != 0) { drawdigit(    tens, 2, countdown_red, countdown_green, countdown_blue); } 
+                      drawdigit( singles, 1, countdown_red, countdown_green, countdown_blue);   // rightmost position 
 }
 
 static void strip(int start, int end, int offset, int red, int green, int blue) {
