@@ -94,6 +94,25 @@ byte default_red   =   0;
 byte default_green =  90;
 byte default_blue  = 255;
 
+// Variables to hold timetable of lessons:
+
+time_t  break1start , break1start_local ;
+time_t  break1end , break1end_local ;
+time_t  break2start , break2start_local ;
+time_t  break2end , break2end_local ;
+time_t  break3start , break3start_local ;
+time_t  break3end , break3end_local ;
+time_t  break4start , break4start_local ;
+time_t  break4end , break4end_local ;
+time_t  break5start , break5start_local ;
+time_t  break5end , break5end_local ;
+time_t  break6start , break6start_local ;
+time_t  break6end , break6end_local ;
+time_t  break7start , break7start_local ;
+time_t  break7end , break7end_local ;
+bool isSchoolbreak = false; // Are we in between lessons?
+unsigned long countdownToBreak = 0; // Countdown to next lesson' start.
+
 ////////////////////////////////////
 // SETUP
 ////////////////////////////////////
@@ -120,9 +139,98 @@ void loop() {
     setSyncProvider(RTC.get); // tells Arduino to get the time from the RTC
     time_t utc = now();
     local = tzMSK.toLocal(utc, &tcr);
+    timetable(); // sets times of lessons and breaks on current day
+    schoolbreak(); // checks whether we are in between lessons
     handleLED(); // subroutine with all stuff that handles LED display
     debugTime(); // prints time to serial monitor
   }
+}
+
+////////////////////////////////////
+// FUNCTIONS - TIMETABLE
+////////////////////////////////////
+
+
+/*
+
+#  Lesson starts Lesson ends Break starts  Break ends
+1 9:00  9:45  9:45  9:55
+2 9:55  10:40 10:40 10:55
+3 10:55 11:40 11:40 11:55
+4 11:55 12:40 12:40 12:55
+5 12:55 13:40 13:40 13:55
+6 13:55 14:40 14:40 14:55
+7 14:55 15:40 15:40 15:55
+8 15:55 16:40 16:40 
+
+*/
+
+void schoolbreak() { // checks whether we are in between lessons
+    // NB: if in reverse order, the value of 4294967295 (32bit integer) would pop up enstead of negative values
+    isSchoolbreak = false; // resets flag
+    countdownToBreak = 0; // resets countdown to next lesson' start.
+
+    if ((local >= break1start_local) && (break1end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break1end_local - local;
+    }
+    if ((local >= break2start_local) && (break2end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break2end_local - local;
+    }
+    if ((local >= break3start_local) && (break3end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break3end_local - local;
+    }
+    if ((local >= break4start_local) && (break4end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break4end_local - local;
+    }
+    if ((local >= break5start_local) && (break5end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break5end_local - local;
+    }
+    if ((local >= break6start_local) && (break6end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break6end_local - local;
+    }
+    if ((local >= break7start_local) && (break7end_local >= local)) {
+        isSchoolbreak = true;
+        countdownToBreak = break7end_local - local;
+    }
+}
+
+void timetable() { // sets times of lessons and breaks on current day (in UTC time zone)
+  break1start  = makeTime(year(local), month(local), day(local),  9 - tzOff, 45,  0);
+  break1end    = makeTime(year(local), month(local), day(local),  9 - tzOff, 54, 59);
+  break2start  = makeTime(year(local), month(local), day(local), 10 - tzOff, 40,  0);
+  break2end    = makeTime(year(local), month(local), day(local), 10 - tzOff, 54, 59);
+  break3start  = makeTime(year(local), month(local), day(local), 11 - tzOff, 40, 0);
+  break3end    = makeTime(year(local), month(local), day(local), 11 - tzOff, 54, 59);
+  break4start  = makeTime(year(local), month(local), day(local), 12 - tzOff, 40,  0);
+  break4end    = makeTime(year(local), month(local), day(local), 12 - tzOff, 54, 59);
+  break5start  = makeTime(year(local), month(local), day(local), 13 - tzOff, 40,  0);
+  break5end    = makeTime(year(local), month(local), day(local), 13 - tzOff, 54, 59);
+  break6start  = makeTime(year(local), month(local), day(local), 14 - tzOff, 40,  0);
+  break6end    = makeTime(year(local), month(local), day(local), 14 - tzOff, 54, 59);
+  break7start  = makeTime(year(local), month(local), day(local), 15 - tzOff, 40,  0);
+  break7end    = makeTime(year(local), month(local), day(local), 15 - tzOff, 54, 59);
+
+  break1start_local = tzMSK.toLocal(break1start, &tcr);
+  break1end_local   = tzMSK.toLocal(break1end, &tcr);
+  break2start_local = tzMSK.toLocal(break2start, &tcr);
+  break2end_local   = tzMSK.toLocal(break2end, &tcr);
+  break3start_local = tzMSK.toLocal(break3start, &tcr);
+  break3end_local   = tzMSK.toLocal(break3end, &tcr);
+  break4start_local = tzMSK.toLocal(break4start, &tcr);
+  break4end_local   = tzMSK.toLocal(break4end, &tcr);
+  break5start_local = tzMSK.toLocal(break5start, &tcr);
+  break5end_local   = tzMSK.toLocal(break5end, &tcr);
+  break6start_local = tzMSK.toLocal(break6start, &tcr);
+  break6end_local   = tzMSK.toLocal(break6end, &tcr);
+  break7start_local = tzMSK.toLocal(break7start, &tcr);
+  break7end_local   = tzMSK.toLocal(break7end, &tcr);
+  
 }
 
 ////////////////////////////////////
@@ -209,6 +317,11 @@ void debugTime() {
       Serial.print(":");
       padZero(second(local)); 
       Serial.println();
+    
+      Serial.print("Are we in a break? ");
+      Serial.println(isSchoolbreak);
+      Serial.print("Countdown to next lesson: ");
+      Serial.println(countdownToBreak);
     }
     prevSecond = second(local);
   }
@@ -268,7 +381,12 @@ static void handleLED() { // Main routine that handles displaying time on LED st
     default_green = map(second(local), 30, 59, 255, 0); 
   } 
   */     
+
+  if(isSchoolbreak = false) {
   drawtime(default_red, default_green, default_blue); // Displays current time
+  } else {
+    drawcountdown(countdownToBreak);
+  }
   pixels.show();   // Sends the updated pixel colors to the hardware.  
 }
 
@@ -292,6 +410,78 @@ static void drawtime(int red, int green, int blue) {
     draw_upper_dot(red, green, blue); 
     draw_lower_dot(red, green, blue); 
   }
+
+}
+
+static void drawcountdown(int cnt) { // displays the countdown - time left till next lesson starts
+  // placeholders for upper and lower digits of countdown timer
+  int tenhundr = 0;
+  int hundreds = 0;
+  int tens = 0;
+  int singles = 0;
+  int countdown_red   = 255;
+  int countdown_green = 255;
+  int countdown_blue  = 255;
+
+  // depending on how much time is left we gradually switch from green to red color:
+  if (cnt >= 600) {
+    // greenest  #2dc937  (45,201,55)
+    countdown_red   =  45;
+    countdown_green = 201;
+    countdown_blue  =  55;
+  }
+
+  if (cnt >= 400) {
+    // greenish  #99c140 (153,193,64)
+    countdown_red   = 153;
+    countdown_green = 193;
+    countdown_blue  =  64;
+  }
+
+  if (cnt >= 200) {
+    // yellow #e7b416  (231,180,22)
+    countdown_red   = 231;
+    countdown_green = 180;
+    countdown_blue  =  22;
+  }
+
+  if (cnt >=  60) {
+    // orange  #db7b2b (219,123,43)
+    countdown_red   = 219;
+    countdown_green = 123;
+    countdown_blue  =  43;
+  }
+
+  if (cnt <   60) {
+    // red #cc3232 (204,50,50)
+    countdown_red   = 255;
+    countdown_green =   0;
+    countdown_blue  =   0;
+  }
+
+  // here we split the countdown timer in 3 digits to be displayed separately
+
+  if (cnt >= 1000) {
+     tenhundr = (cnt / 1000);
+     cnt = cnt % 1000;
+  }
+  
+  if (cnt >= 100) {
+     hundreds = (cnt / 100);
+     cnt = cnt % 100;
+  }
+  
+  if (cnt >= 10) {
+     tens = (cnt / 10);
+     cnt = cnt % 10;
+  }
+  
+  singles = cnt;
+
+  if(tenhundr != 0) { drawdigit(tenhundr, 4, countdown_red, countdown_green, countdown_blue); } // leftmost position (4th from right)
+  if(hundreds != 0) { drawdigit(hundreds, 3, countdown_red, countdown_green, countdown_blue); }  
+  if(    tens != 0) { drawdigit(    tens, 2, countdown_red, countdown_green, countdown_blue); } 
+                      drawdigit( singles, 1, countdown_red, countdown_green, countdown_blue);   // rightmost position 
 }
 
 static void strip(int start, int end, int offset, int red, int green, int blue) {
