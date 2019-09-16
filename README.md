@@ -12,7 +12,7 @@ Initally, a large TV screen was used instead of this clock:
 
 ![Old TV was replaced with this clock](https://user-images.githubusercontent.com/1763243/64928726-cf8ee880-d80b-11e9-99cf-2e64978a1c44.png)
 
-The clock can be assembled from laser-cut sheets of 4mm plywood. The layouts (in AutoCAD format) are designed in such a way that any laser cutter with working area of as low as 300x600mm could be used. Few dozen of 40mm M3 screws are needed for assembly. Diffusors are made of 2mm matte acrylic.
+The clock can be assembled from laser-cut sheets of 3-4mm plywood. The [layouts (in AutoCAD format)](https://github.com/Bougakov/wallclock/tree/master/CAD%20files%20%28plywood%20lasercut%29) are designed in such a way that any laser cutter with working area of as low as 300x600mm could be used. Few dozen of 40mm M3 screws are needed for assembly. Diffusors are made of 2mm matte acrylic.
 
 [Click to view video on Instagram: ![Countdown - Instagram](https://user-images.githubusercontent.com/1763243/64928825-ceaa8680-d80c-11e9-9caf-27436787bc27.png)](https://www.instagram.com/p/B2cq6O_Ikv1/)
 
@@ -30,6 +30,8 @@ The clock can be assembled from laser-cut sheets of 4mm plywood. The layouts (in
 
 Avoid voltage drop by wiring LED strip to external power source in multiple points.
 For heat dissipation use 5m of 10mm aluminum strip cut to length of LED fragments. There are vent holes on the back that allow aluminum strips to dissipate heat to the wall. Fix the LEDs and strips using zip ties.
+
+To radically simplify the programming of the clock make sure you connect the segments in each digit in the identical order. Check out attached Excel file to get the idea on how to do it. 
 
 ## Adjusting time table for your school:
 
