@@ -405,14 +405,17 @@ void drawcountdown(int cnt) { // displays the countdown - time left till next le
   int ss_hi_digit = (ss - ss_lo_digit) / 10;
 
   // for the final 60 seconds before the bell rings we switch color from violet to red:
+  byte countdown_red;
+  byte countdown_green;
+  byte countdown_blue;
   if (cnt >= 59) { 
-    byte countdown_red   = 255;
-    byte countdown_green =   0;
-    byte countdown_blue  = 255;
+    countdown_red   = 255;
+    countdown_green =   0;
+    countdown_blue  = 255;
   } else {
-    byte countdown_red   = 255;
-    byte countdown_green =   0;
-    byte countdown_blue  =   0;
+    countdown_red   = 255;
+    countdown_green =   0;
+    countdown_blue  =   0;
   }
 
   drawdigit(mm_hi_digit, 4, countdown_red, countdown_green, countdown_blue);  // leftmost position (4th from right)
