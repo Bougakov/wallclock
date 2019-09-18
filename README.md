@@ -6,6 +6,8 @@ During the lessons and in after-school hours it displays current time; during th
 
 This clock is a part of a large-scale redesign of School 57 by a Russian architect and designer, Mia Karlova, which won the "Best public space" award by AD Magazine in https://www.admagazine.ru/ad-design-award/novyj-oblik-moskovskoj-shkoly-57 and was featured in FRAME magazine: https://www.frameweb.com/news/moscow-school-57-mia-karlova
 
+![Assembled clock on the wall](https://user-images.githubusercontent.com/1763243/65143810-5d81f380-da05-11e9-9e41-a72968dae387.png)
+
 [Click to view video on Instagram: ![Preview - Instagram](https://user-images.githubusercontent.com/1763243/64928813-a28f0580-d80c-11e9-9330-3cba9d5aab31.png)](https://www.instagram.com/p/BxpXTDVDegR/)
 
 Initally, a large TV screen was used instead of this clock:
