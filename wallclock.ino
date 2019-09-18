@@ -89,9 +89,9 @@ int prevSecond = 0; // for debugging
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
 // default colors:
-byte default_red   =   0;
-byte default_green =  90;
-byte default_blue  = 255;
+byte default_red   =  32;
+byte default_green = 255;
+byte default_blue  =  32;
 
 // Variables to hold timetable of lessons:
 time_t  break0start ;
@@ -393,61 +393,38 @@ void drawtime(int red, int green, int blue) {
 }
 
 void drawcountdown(int cnt) { // displays the countdown - time left till next lesson starts
-  // placeholders for upper and lower digits of countdown timer
-  int thousands = 0;
-  int  hundreds = 0;
-  int      tens = 0;
-  int   singles = 0;
-  
-  int countdown_red   = 220;
-  int countdown_green = 220;
-  int countdown_blue  = 220;
 
-  if (cnt < 60) {
-    countdown_red = 255;
-    countdown_green = 0;
-    countdown_blue = 0;
-  }
+  // conversion from "duration" in seconds to mm:ss:
+  int ss = cnt % 60;        // seconds left till end of break
+  int mm = (cnt - ss) / 60; // minutes left
 
-  // here we split the countdown timer in 3 digits to be displayed separately
+  // placeholders for upper and lower digits of time
+  int mm_lo_digit = mm % 10;
+  int mm_hi_digit = (mm - mm_lo_digit) / 10;
+  int ss_lo_digit = ss % 10;
+  int ss_hi_digit = (ss - ss_lo_digit) / 10;
 
-  if (cnt >= 1000) {
-    thousands = (cnt / 1000);
-    cnt = cnt % 1000;
-  }
-
-  if (cnt >= 100) {
-    hundreds = (cnt / 100);
-    cnt = cnt % 100;
+  // for the final 60 seconds before the bell rings we switch color from violet to red:
+  if (cnt >= 59) { 
+    byte countdown_red   = 255;
+    byte countdown_green =   0;
+    byte countdown_blue  = 255;
+  } else {
+    byte countdown_red   = 255;
+    byte countdown_green =   0;
+    byte countdown_blue  =   0;
   }
 
-  if (cnt >= 10) {
-    tens = (cnt / 10);
-    cnt = cnt % 10;
-  }
+  drawdigit(mm_hi_digit, 4, countdown_red, countdown_green, countdown_blue);  // leftmost position (4th from right)
+  drawdigit(mm_lo_digit, 3, countdown_red, countdown_green, countdown_blue);  
+  drawdigit(ss_hi_digit, 2, countdown_red, countdown_green, countdown_blue);  
+  drawdigit(ss_lo_digit, 1, countdown_red, countdown_green, countdown_blue);  // rightmost position
 
-  singles = cnt;
-
-  if (thousands != 0) { // leftmost position (4th from right)
-    drawdigit(thousands, 4, countdown_red, countdown_green, countdown_blue);
+  if ((millis() % 400) >= 200) {
+    // blinks with colon every 200ms
+    draw_upper_dot(countdown_red, countdown_green, countdown_blue); 
+    draw_lower_dot(countdown_red, countdown_green, countdown_blue); 
   }
-  if (hundreds != 0) {
-    drawdigit(hundreds, 3, countdown_red, countdown_green, countdown_blue);
-  }
-  else {
-    if (thousands != 0) {
-      drawdigit(hundreds, 3, countdown_red, countdown_green, countdown_blue);
-    }
-  }
-  if (tens != 0) {
-    drawdigit(tens, 2, countdown_red, countdown_green, countdown_blue);
-  }
-  else {
-    if (hundreds != 0) {
-      drawdigit(tens, 2, countdown_red, countdown_green, countdown_blue);
-    }
-  }
-  drawdigit(singles, 1, countdown_red, countdown_green, countdown_blue); // rightmost position
 }
 
 void strip(int start, int end, int offset, int red, int green, int blue) {
