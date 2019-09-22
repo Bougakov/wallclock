@@ -2,9 +2,11 @@
 
 The design is authored in AutoCAD - the original intent was to prepare the layouts in such way that they would fit into 60x30cm workspace.
 
-Clock is assembled from several layers using M3 bolts. Wires are fed through internal channels.
+Clock is assembled from several layers using M3 bolts. Wires are fed through internal channels. Even and odd layers have different orientation (connecting faces look like arrows that point left on even layers and right at odd layers). Simply turn respective layers on and off before exporting the design to laser cutter:
 
-The thickness of plywood can be 4 or 5mm or even thicker - it doesn't matter. 
+![AutoCAD layers](https://user-images.githubusercontent.com/1763243/65395550-e09ba480-dd8b-11e9-9dcc-2d3c6ab35801.png)
+
+The thickness of plywood can be 4 or 5mm or even thicker - it doesn't matter. More layers is better (more distance from LEDs to the diffusor, more uniform lightning), but it takes more material and the clock gets heavier.
 
 ![Cutting on a laser](https://user-images.githubusercontent.com/1763243/65395360-3a4e9f80-dd89-11e9-8667-ff579130c7ad.png)
 
