@@ -18,6 +18,10 @@ The clock can be assembled from laser-cut sheets of 3-4mm plywood. The [layouts 
 
 [Click to view video on Instagram: ![Countdown - Instagram](https://user-images.githubusercontent.com/1763243/64928825-ceaa8680-d80c-11e9-9caf-27436787bc27.png)](https://www.instagram.com/p/B2cq6O_Ikv1/)
 
+Click the preview of the AutoCAD drawing to read more on the assembly:
+
+[![AutoCAD drawing in full glory](https://user-images.githubusercontent.com/1763243/65395618-083f3c80-dd8d-11e9-930d-021e4f74db41.png)](https://github.com/Bougakov/wallclock/tree/master/CAD%20files%20%28plywood%20lasercut%29)
+
 ## Wiring
 
 * GPS is connected (via "MAX232" RS232 to TTL converter) to `D3` pin of Arduino. Don't forget to double-check the baud rate of your GPS.
