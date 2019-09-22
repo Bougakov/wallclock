@@ -28,11 +28,10 @@ Make sure that you insulate the ends of the LED strips where they could accident
 
 ![Tape on the ends](https://user-images.githubusercontent.com/1763243/65395329-d1672780-dd88-11e9-91ec-0b9e72c27690.png)
 
+Soldering that many strips feels tedious...
+
 ![Heat dissipation](https://user-images.githubusercontent.com/1763243/65395319-bac0d080-dd88-11e9-9111-b4a6cccdb3bc.png)
 
-
-
-
-
+Here is the overall look (center part not painted yet):
 
 ![Overall look](https://github.com/Bougakov/wallclock/blob/master/CAD%20files%20(plywood%20lasercut)/image.png)
